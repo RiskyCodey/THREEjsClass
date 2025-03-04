@@ -4,9 +4,12 @@ import { RGBELoader } from "https://unpkg.com/three@0.153/examples/jsm/loaders/R
 
 let renderer, scene, container, camera;
 let arrowPressed = {left: false, right: false, up: false, down: false};
-let keyPressed = {" ": false};
-let increment = 0.025;
-
+let velocityX = 0, velocityZ = 0;
+let acceleration = 0.05;
+let friction = 0.70;
+let velocityY = 0;
+let gravity = 0.001;
+let isJumping = false;
 
 window.addEventListener("load", function() {
     start();
@@ -42,10 +45,10 @@ async function start() {
     light02.castShadow = true;
     scene.add(light02);
 
-    const geometry = new THREE.CylinderGeometry(0.2, 0.2, 0.5);
+    const geometry = new THREE.CylinderGeometry(0.2, 0.2, 0.6);
     const material = new THREE.MeshPhongMaterial({color: 0x8b7500, specular: 0xffd700, shininess: 50});
     const cylinder = new THREE.Mesh(geometry, material);
-    cylinder.position.y = -0.25;
+    cylinder.position.y = 0;
     cylinder.castShadow = true;
     cylinder.receiveShadow = true;
     scene.add(cylinder);
@@ -56,7 +59,6 @@ async function start() {
     chessboardTexture.wrapT = THREE.RepeatWrapping;
 
     chessboardTexture.repeat.set(1, 1);
-
 
     const planeGeometry = new THREE.PlaneGeometry(10, 10);
     const planeMaterial = new THREE.MeshStandardMaterial({color: 0xcdaa7d, map:chessboardTexture});
@@ -84,39 +86,67 @@ async function start() {
                     arrowPressed.left = true;
                     break;
                 case " ":
-                    keyPressed.space = true;
+                    if(!isJumping) {
+                        velocityY = 0.04;
+                        isJumping = true;
+                    }
                     break;
             }
         },
         false,
     );
-
-    document.addEventListener(
-        "keyup",
-        (event) => {
-            arrowPressed.up = false;
-            arrowPressed.down = false;
-            arrowPressed.right = false;
-            arrowPressed.left = false;
-            keyPressed.space = false;
-        },
-        false,
-    );
  
+    document.addEventListener(
+        "keyup", 
+        (event) => {
+            const keyName = event.key;
+            switch (keyName) {
+                case "ArrowUp":
+                    arrowPressed.up = false;
+                    break;
+                case "ArrowDown":
+                    arrowPressed.down = false;
+                    break;
+                case "ArrowRight":
+                    arrowPressed.right = false;
+                    break;
+                case "ArrowLeft":
+                    arrowPressed.left = false;
+                    break;
+            }
+        },
+        false
+    );
+
 animate();
 
 function animate() {
-    
-    if (arrowPressed.left) cylinder.position.x -= increment;
-    if (arrowPressed.right) cylinder.position.x += increment;
-    if (arrowPressed.up) cylinder.position.z -= increment;
-    if (arrowPressed.down) cylinder.position.z += increment;
+    //apply acceleration for movement
+    if (arrowPressed.left) velocityX -= acceleration;
+    if (arrowPressed.right) velocityX += acceleration;
+    if (arrowPressed.up) velocityZ -= acceleration;
+    if (arrowPressed.down) velocityZ += acceleration;
 
-    if (keyPressed.space) {
-        cylinder.position.y += increment; 
-      }else if(cylinder.position.y > -0.25) {
-        cylinder.position.y -= increment; 
-      }
+    //friction
+    velocityX *= friction;
+    velocityZ *= friction;
+
+    //Move the cylinder with inertia
+    cylinder.position.x += velocityX;
+    cylinder.position.z += velocityZ;
+
+    //Jump Mechanics
+    if (isJumping) {
+        cylinder.position.y += velocityY; //Move up
+        velocityY -= gravity; //Gravity Pull
+
+        //Stop Jump
+        if(cylinder.position.y <= 0){
+            cylinder.position.y = 0;
+            isJumping = false;
+            velocityY = 0;
+        }
+    }
 
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
@@ -129,5 +159,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     animate();
 }
+
 window.addEventListener("resize", onWindowResize);
 }
